@@ -1,0 +1,5 @@
+Some weights of CLIPTextModelWithProjection were not initialized from the model checkpoint at stabilityai/stable-diffusion-xl-base-1.0 and are newly initialized: ['text_projection.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+Resolving data files: 100%|██████████████████████████████████| 200/200 [00:00<00:00, 372827.02it/s]
+Map: 100%|████████████████████████████████████████████████| 100/100 [00:08<00:00, 11.19 examples/s]
+Steps: 100%|███████████████████████████████████████████████████| 1000/1000 [20:45<00:00,  1.22s/it]

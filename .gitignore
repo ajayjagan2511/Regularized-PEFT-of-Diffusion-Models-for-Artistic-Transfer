@@ -1,0 +1,27 @@
+# ==== project-specific directories ====
+/outputs/
+
+# ==== Python ====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.conda/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# ==== Env / secrets ====
+.env
+.env.*
+*.key
+*.pem
+
+# ==== IDE / Editor ====
+.vscode/
+.idea/
+*.iml
+
+# ==== OS junk ====
+.DS_Store
+Thumbs.db
