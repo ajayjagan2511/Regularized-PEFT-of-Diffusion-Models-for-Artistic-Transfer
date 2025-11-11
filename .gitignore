@@ -1,5 +1,9 @@
 # ==== project-specific directories ====
 /outputs/
+/AJ/
+/wandb/
+/hf_atrifacts/
+/data_gen.ipynb
 
 # ==== Python ====
 __pycache__/
