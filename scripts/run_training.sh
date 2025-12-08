@@ -20,9 +20,9 @@ ORIGINAL_VAL_DIR_NAME="monet_style_original_val"
 PROJECT_NAME="cvpr-regularized-sweep-v2" 
 
 # --- Hyperparameter Search Space ---
-LEARNING_RATES=(5e-4)
+LEARNING_RATES=(1e-4 1e-5)
 RANKS=(16)
-LAMBDAS=(1.0)
+LAMBDAS=(0.0 10)
 
 # --- Main Loop ---
 for lr in "${LEARNING_RATES[@]}"; do
@@ -40,7 +40,7 @@ for lr in "${LEARNING_RATES[@]}"; do
             echo "================================================="
 
             # 2. Execute Training
-            CUDA_VISIBLE_DEVICES='3' accelerate launch src/train_lora_reg.py \
+            CUDA_VISIBLE_DEVICES='0' accelerate launch src/train_lora_reg.py \
             --pretrained_model_name_or_path="${PRETRAINED_MODEL}" \
             --pretrained_vae_model_name_or_path="${VAE_MODEL}" \
             --data_parent_dir="${DATA_PARENT_DIR}" \

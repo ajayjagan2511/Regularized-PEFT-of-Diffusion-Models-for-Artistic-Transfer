@@ -38,7 +38,7 @@ for lr in "${LEARNING_RATES[@]}"; do
 
     # 2. Execute Training
     # Using gradient_accumulation_steps=4 to simulate larger batches on single GPU
-    CUDA_VISIBLE_DEVICES='3' accelerate launch src/train_full_finetune.py \
+    CUDA_VISIBLE_DEVICES='0' accelerate launch src/train_full_finetune.py \
     --pretrained_model_name_or_path="${PRETRAINED_MODEL}" \
     --pretrained_vae_model_name_or_path="${VAE_MODEL}" \
     --data_parent_dir="${DATA_PARENT_DIR}" \
