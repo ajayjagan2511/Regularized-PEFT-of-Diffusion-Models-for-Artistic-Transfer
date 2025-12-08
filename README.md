@@ -211,4 +211,3 @@ Based on the ablation study in the paper, the optimal configurations are:
 | Regularized LoRA (Ours) | 1e-4 | 16   | 10.0         | 5.0       |
 
 > **Note:** We utilize Min-SNR weighting (`--snr_gamma=5.0`) in all LoRA experiments to stabilize training.
-
