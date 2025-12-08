@@ -1,150 +1,214 @@
-# regdiffusion-peft
-Dual-model regularized parameter-efficient fine-tuning (LoRA/SaRA) of SDXL for high-fidelity artistic style transfer while preserving base model priors.
+# Regularized Parameter-Efficient Fine-Tuning (Reg-PEFT) for SDXL
 
-# SDXL — VAE FP16 Fix (Regularized) & Monet LoRA
+[![SDXL](https://img.shields.io/badge/Model-SDXL%201.0-blue)](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
 
-**Hugging Face:** [`batshiv/sdxl-vae-fp16-fix-regularized`](https://huggingface.co/batshiv/sdxl-vae-fp16-fix-regularized)  
-This repo hosts training artifacts and example images. Large binaries live on the Hub (not GitHub).
+This repository contains the official implementation for the paper **"Regularized Parameter-Efficient Fine-Tuning of Diffusion Models for Artistic Transfer"**.
 
----
-
-## Contents
-
-```
-batshiv/sdxl-vae-fp16-fix-regularized
-├── lora_baseline_monet/
-│   └── checkpoint-500/
-│       ├── model.safetensors         # model state (at this step; may vary by trainer)
-│       ├── pytorch_lora_weights.bin  # LoRA adapter weights
-│       ├── optimizer.bin             # optimizer state (resume training)
-│       ├── random_states_0.pkl       # RNG state (deterministic resume)
-│       └── scaler.pt                 # AMP scaler (fp16 training)
-└── evaluation_images/
-    ├── evaluation_grid.png
-    ├── prompt_00.png
-    ├── prompt_01.png
-    ├── prompt_02.png
-    ├── prompt_03.png
-    ├── prompt_04.png
-    └── prompt_05.png
-```
-
-> If more checkpoints/folders are added later, they’ll appear alongside the paths above.
+We propose a Dual-Model "Teacher-Student" framework for fine-tuning Stable Diffusion XL (SDXL) on artistic styles. By utilizing a frozen teacher anchor and a **Signal-to-Noise Ratio (SNR) weighted regularization loss**, we achieve high-fidelity style transfer while preventing catastrophic forgetting of structural priors.
 
 ---
 
-## Install
+## 🛠️ Installation
+
+Clone the repository:
 
 ```bash
-pip install -U huggingface_hub diffusers accelerate
-# Plus PyTorch that matches your CUDA/CPU setup:
-# See https://pytorch.org/get-started
+git clone https://github.com/yourusername/regdiffusion-peft.git
+cd regdiffusion-peft
 ```
 
-If the repo is **private**, set your token:
+Install dependencies (this project relies on `diffusers`, `accelerate`, `peft`, and `torchmetrics` for evaluation):
 
 ```bash
-export HF_TOKEN=hf_********************************
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118  # Adjust for your CUDA version
+pip install -U diffusers accelerate transformers peft wandb bitsandbytes torchmetrics hf_transfer huggingface_hub
+```
+
+Configure Accelerate (Mixed Precision FP16 is recommended):
+
+```bash
+accelerate config
 ```
 
 ---
 
-## Use case A — Inference with the Monet LoRA (SDXL)
+## 📊 Data Preparation
+
+The training pipeline requires **paired data** (Content Image ↔ Style Image).
+
+Structure your data directory as follows:
+
+```text
+/path/to/data/
+├── monet_style/           # Stylized images (Target)
+│   ├── image_01.jpg
+│   └── ...
+└── monet_style_original/  # Content/Structure images (Source)
+    ├── image_01.jpg       # Must match filenames in style folder
+    └── ...
+```
+
+Pre-process images using the provided script to center-crop and resize images to **1024×1024** (standard SDXL resolution):
+
+```bash
+# Edit src/preprocess_images.py to point to your directories first
+python src/preprocess_images.py
+```
+
+---
+
+## 🚀 Replicating Experiments
+
+We provide shell scripts to reproduce the experiments from the paper (Standard LoRA, Regularized LoRA, and Full Fine-Tuning).
+
+### 1. Regularized LoRA (Proposed Method) & Standard LoRA
+
+The script `scripts/run_training.sh` is set up to run a hyperparameter sweep over learning rates and regularization strengths (`λ`).
+
+- **Standard LoRA Baseline:** `λ = 0.0`  
+- **Regularized LoRA (Ours):** `λ = 10.0` (Best reported configuration)
+
+To run the experiments:
+
+1. Open `scripts/run_training.sh`.
+2. Update the `DATA_PARENT_DIR` variable to point to your data folder.
+3. Execute the script:
+
+```bash
+chmod +x scripts/run_training.sh
+./scripts/run_training.sh
+```
+
+### 2. Full Fine-Tuning (Baseline)
+
+To compare against Full Fine-Tuning (FFT), use the provided FFT script. Note that FFT requires significantly more VRAM and uses lower learning rates.
+
+1. Open `scripts/run_fft.sh`.
+2. Update `DATA_PARENT_DIR`.
+3. Execute:
+
+```bash
+chmod +x scripts/run_fft.sh
+./scripts/run_fft.sh
+```
+
+---
+
+## 📈 Evaluation & Benchmarking
+
+We provide a comprehensive evaluation script (`src/evaluate.py`) that calculates:
+
+- **FID** – Realism  
+- **SSIM** – Structural Preservation  
+- **Gram Matrix Loss** – Style Consistency  
+- **CLIP Score** – Semantic Alignment  
+
+The evaluation pipeline uses `StableDiffusionXLImg2ImgPipeline` to assess how well the model applies style to a validation content image.
+
+### 1. Configuration
+
+Before running, edit the **CONFIGURATION** section at the top of `src/evaluate.py`:
+
+```python
+# src/evaluate.py
+
+# 1. Set your local data paths
+DATASET_CONFIGS = {
+    "Validation": {
+        "orig_dir": "/path/to/your/monet_style_original_val",
+        "gt_dir":   "/path/to/your/monet_style_val",
+        "output_root": "./eval_results/val"
+    },
+    # Add more dataset splits if needed...
+}
+
+# 2. Define the models you want to benchmark
+MODEL_CONFIGS = {
+    "Base_SDXL": {
+        "type": "base",
+        "path": None
+    },
+
+    # For LoRA (can load from HuggingFace Hub or local path)
+    "My_Reg_LoRA": {
+        "type": "lora",
+        "path": "outputs/lr_1e-4_lambda_10_reg/checkpoint-epoch-20/pytorch_lora_weights.bin",
+        # OR use "repo_id" and "filename" for HF Hub download, e.g.:
+        # "repo_id": "username/my-reg-lora",
+        # "filename": "pytorch_lora_weights.bin",
+    },
+
+    # For Full Fine-Tuning
+    "FFT_Model": {
+        "type": "fft",
+        "path": "outputs/FFT_run/checkpoint-epoch-20"
+    }
+}
+```
+
+Make sure the `MODEL_CONFIGS` dictionary matches:
+
+- The filesystem layout produced by your training scripts, **and/or**
+- Any published checkpoints on the HuggingFace Hub if you use `repo_id` and `filename`.
+
+### 2. Run Evaluation
+
+Once configured, run the script:
+
+```bash
+python src/evaluate.py
+```
+
+### 3. Output
+
+The script will generate:
+
+- **Generated Images** – Saved in the `output_root` directory for each dataset configuration, for visual inspection.
+- **CSV Report** – A `eval_report_TIMESTAMP.csv` file containing FID, SSIM, Gram, and CLIP scores for all models.
+- **JSON Report** – A detailed JSON file with full metric dumps for downstream analysis.
+
+---
+
+## 💻 Inference (Quick Start)
+
+You can load the trained LoRA adapters using `diffusers` in a standalone script:
 
 ```python
 import torch
 from diffusers import DiffusionPipeline
 
-# Base SDXL (change to your preferred base/refiner if needed)
+# 1. Load Base SDXL
 pipe = DiffusionPipeline.from_pretrained(
     "stabilityai/stable-diffusion-xl-base-1.0",
-    torch_dtype=torch.float16
+    torch_dtype=torch.float16,
+    variant="fp16",
+    use_safetensors=True
 ).to("cuda")
 
-# Load LoRA directly from the Hub repo
-pipe.load_lora_weights(
-    "batshiv/sdxl-vae-fp16-fix-regularized",
-    weight_name="lora_baseline_monet/checkpoint-500/pytorch_lora_weights.bin",
-)
+# 2. Load Your Trained Adapter
+adapter_path = "./outputs/lr_1e-4_lambda_10_rank_16_reg/checkpoint-epoch-20/pytorch_lora_weights.bin"
+pipe.load_lora_weights(adapter_path, adapter_name="monet")
 
-# Optional: fuse & scale LoRA strength
-pipe.fuse_lora(lora_scale=0.8)
+# 3. Fuse & Scale (Optional but recommended)
+pipe.set_adapters(["monet"], adapter_weights=[1.0])
 
-image = pipe(prompt="a Monet-style landscape at dusk, soft brush strokes, pastel color palette").images[0]
-image.save("sample_monet.png")
+# 4. Generate
+prompt = "sksmonet, a painting in the style of Monet, a house by the river"
+image = pipe(prompt=prompt, num_inference_steps=30).images[0]
+image.save("result.png")
 ```
 
 ---
 
-## Use case B — Resume training from a checkpoint
+## 📝 Hyperparameters
 
-```python
-from huggingface_hub import snapshot_download
-import os
+Based on the ablation study in the paper, the optimal configurations are:
 
-ckpt_root = snapshot_download(
-    repo_id="batshiv/sdxl-vae-fp16-fix-regularized",
-    allow_patterns=["lora_baseline_monet/checkpoint-500/**"],
-    local_dir="hf_artifacts",
-    local_dir_use_symlinks=False
-)
+| Method                  | LR   | Rank | Lambda (`λ`) | SNR Gamma |
+|-------------------------|------|------|--------------|-----------|
+| Standard LoRA           | 1e-4 | 16   | 0.0          | 5.0       |
+| Regularized LoRA (Ours) | 1e-4 | 16   | 10.0         | 5.0       |
 
-resume_dir = os.path.join(ckpt_root, "lora_baseline_monet/checkpoint-500")
-print("Checkpoint path:", resume_dir)
-# Feed `resume_dir` to your trainer's --resume / --checkpoint arg.
-```
+> **Note:** We utilize Min-SNR weighting (`--snr_gamma=5.0`) in all LoRA experiments to stabilize training.
 
----
-
-## Use case C — Grab evaluation images (for reports)
-
-```python
-from huggingface_hub import snapshot_download
-import glob, os
-
-imgs_root = snapshot_download(
-    repo_id="batshiv/sdxl-vae-fp16-fix-regularized",
-    allow_patterns=["evaluation_images/*.png"],
-    local_dir="hf_artifacts",
-    local_dir_use_symlinks=False
-)
-
-for p in sorted(glob.glob(os.path.join(imgs_root, "evaluation_images/*.png"))):
-    print("Found image:", p)
-```
-
----
-
-## Reproducibility
-
-Pin an exact revision (commit SHA or tag):
-
-```python
-from huggingface_hub import snapshot_download
-
-snapshot_download(
-    repo_id="batshiv/sdxl-vae-fp16-fix-regularized",
-    revision="<commit-sha-or-tag>",
-    allow_patterns=["lora_baseline_monet/checkpoint-500/**"],
-    local_dir="hf_artifacts",
-    local_dir_use_symlinks=False
-)
-```
-
----
-
-## Notes
-
-- Large binaries (`*.bin`, `*.safetensors`) live on the Hub; keep them out of your GitHub repo via `.gitignore`.
-- If you later add a separately exported VAE (e.g., saved with `save_pretrained()`), place it under `vae/` and load with:
-
-```python
-from diffusers import AutoencoderKL
-from torch import float16
-
-pipe.vae = AutoencoderKL.from_pretrained(
-    "batshiv/sdxl-vae-fp16-fix-regularized",
-    subfolder="vae",
-    torch_dtype=float16,
-)
-```
