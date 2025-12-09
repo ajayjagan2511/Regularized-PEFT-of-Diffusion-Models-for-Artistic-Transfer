@@ -1,0 +1,18 @@
+# Core Diffusion & ML Libraries
+diffusers
+accelerate
+transformers
+peft
+torchmetrics
+bitsandbytes
+
+# Utilities
+wandb
+hf_transfer
+huggingface_hub
+scipy
+ftfy
+
+# PyTorch (Standard install - see note in readme.md regarding CUDA)
+torch
+torchvision
