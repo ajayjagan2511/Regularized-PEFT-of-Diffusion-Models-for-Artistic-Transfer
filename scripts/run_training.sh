@@ -3,10 +3,16 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
+# --- Check Arguments ---
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <data_parent_dir>"
+    exit 1
+fi
+
 # --- Fixed Parameters ---
 PRETRAINED_MODEL="stabilityai/stable-diffusion-xl-base-1.0"
 VAE_MODEL="madebyollin/sdxl-vae-fp16-fix"
-DATA_PARENT_DIR="/home/shivamsinghal/LTC/GEN/data"
+DATA_PARENT_DIR="$1"
 
 # Train Folders
 MONET_DIR_NAME="monet_style"

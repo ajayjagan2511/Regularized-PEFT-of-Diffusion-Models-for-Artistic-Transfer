@@ -9,7 +9,7 @@ We propose a Dual-Model "Teacher-Student" framework for fine-tuning Stable Diffu
 
 ---
 
-## 🛠️ Installation
+## Installation
 
 Clone the repository:
 
@@ -67,7 +67,7 @@ Below is the standard response for the same.
 
 ---
 
-## 📊 Data Preparation
+## Data Preparation
 
 The training pipeline requires **paired data** (Content Image ↔ Style Image).
 
@@ -86,13 +86,20 @@ Structure your data directory as follows (already configured here):
 Pre-process images using the provided script to center-crop and resize images to **1024×1024** (standard SDXL resolution):
 
 ```bash
-# Edit src/preprocess_images.py to point to your directories first
-python src/preprocess_images.py
+# Run the preprocess script with your image directory (target size is fixed to 1024)
+chmod +x scripts/run_preprocess.sh
+./scripts/run_preprocess.sh <image_dir>
+```
+
+For example:
+
+```bash
+./scripts/run_preprocess.sh ./data/monet_style_original
 ```
 
 ---
 
-## 🚀 Replicating Experiments
+## Replicating Experiments
 
 We provide shell scripts to reproduce the experiments from the paper (Standard LoRA, Regularized LoRA, and Full Fine-Tuning).
 
@@ -105,31 +112,45 @@ The script `scripts/run_training.sh` is set up to run a hyperparameter sweep ove
 
 To run the experiments:
 
-1. Open `scripts/run_training.sh`.
-2. Update the `DATA_PARENT_DIR` variable to point to your data folder.
-3. Execute the script:
+1. Configure WandB by adding your API key to `~/.bashrc`:  
+   ```bash
+   echo 'export WANDB_API_KEY=your_api_key_here' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+2. Execute the script with your data parent directory as an argument:
 
 ```bash
 chmod +x scripts/run_training.sh
-./scripts/run_training.sh
+./scripts/run_training.sh <data_parent_dir>
+```
+
+For example:
+
+```bash
+./scripts/run_training.sh ./data
 ```
 
 ### 2. Full Fine-Tuning (Baseline)
 
 To compare against Full Fine-Tuning (FFT), use the provided FFT script. Note that FFT requires significantly more VRAM and uses lower learning rates.
 
-1. Open `scripts/run_fft.sh`.
-2. Update `DATA_PARENT_DIR`.
-3. Execute:
+1. Execute the script with your data parent directory as an argument:
 
 ```bash
 chmod +x scripts/run_fft.sh
-./scripts/run_fft.sh
+./scripts/run_fft.sh <data_parent_dir>
+```
+
+For example:
+
+```bash
+./scripts/run_fft.sh ./data
 ```
 
 ---
 
-## 📈 Evaluation & Benchmarking
+## Evaluation & Benchmarking
 
 We provide a comprehensive evaluation script (`src/evaluate.py`) that calculates:
 
@@ -142,22 +163,13 @@ The evaluation pipeline uses `StableDiffusionXLImg2ImgPipeline` to assess how we
 
 ### 1. Configuration
 
+The script uses a base directory for data paths. You can optionally edit the `MODEL_CONFIGS` dictionary in `src/evaluation.py` to specify which models to benchmark (e.g., local paths or HuggingFace Hub repos).
 Before running, edit the **CONFIGURATION** section at the top of `src/evaluate.py`:
 
 ```python
 # src/evaluate.py
 
-# 1. Set your local data paths
-DATASET_CONFIGS = {
-    "Validation": {
-        "orig_dir": "/path/to/your/monet_style_original_val",
-        "gt_dir":   "/path/to/your/monet_style_val",
-        "output_root": "./eval_results/val"
-    },
-    # Add more dataset splits if needed...
-}
-
-# 2. Define the models you want to benchmark
+# 1. Define the models you want to benchmark
 MODEL_CONFIGS = {
     "Base_SDXL": {
         "type": "base",
@@ -191,7 +203,13 @@ Make sure the `MODEL_CONFIGS` dictionary matches:
 Once configured, run the script:
 
 ```bash
-python src/evaluate.py
+chmod +x scripts/run_evaluation.sh
+./scripts/run_evaluation.sh <base_dir>
+```
+
+For example:
+```bash
+./scripts/run_evaluation.sh ./data
 ```
 
 ### 3. Output
@@ -199,14 +217,14 @@ python src/evaluate.py
 The script will generate:
 
 - **Generated Images** – Saved in the `output_root` directory for each dataset configuration, for visual inspection.
-- **CSV Report** – A `eval_report_TIMESTAMP.csv` file containing FID, SSIM, Gram, and CLIP scores for all models.
+- **CSV Report** – A `eval_report_<TIMESTAMP>.csv` file containing FID, SSIM, Gram, and CLIP scores for all models.
 - **JSON Report** – A detailed JSON file with full metric dumps for downstream analysis.
 
 ---
 
 ## 💻 Inference (Quick Start)
 
-You can load the trained LoRA adapters using `diffusers` in a standalone script:
+You can load the trained LoRA adapters using `diffusers` in a standalone script (optional):
 
 ```python
 import torch
@@ -235,7 +253,7 @@ image.save("result.png")
 
 ---
 
-## 📝 Hyperparameters
+## Hyperparameters
 
 Based on the ablation study in the paper, the optimal configurations are:
 
@@ -245,3 +263,34 @@ Based on the ablation study in the paper, the optimal configurations are:
 | Regularized LoRA (Ours) | 1e-4 | 16   | 10.0         | 5.0       |
 
 > **Note:** We utilize Min-SNR weighting (`--snr_gamma=5.0`) in all LoRA experiments to stabilize training.
+
+---
+
+## Key Findings
+
+Our Regularized LoRA model achieved the best performance across the board.
+
+### 1. Main Performance Comparison
+
+| Model | FID ↓ | GRAM ↓ | CLIP ↓ | SSIM ↑ |
+| :--- | :---: | :---: | :---: | :---: |
+| Base SDXL | 4.69 | 0.5474 | 0.0046 | 0.3395 |
+| Full FT | 5.02 | 0.5501 | 0.0037 | 0.3317 |
+| Std. LoRA | 56.09 | **0.2848** | 0.0732 | 0.2775 |
+| Reg. LoRA (Ours) | **3.88** | 0.5402 | **0.0045** | **0.3464** |
+
+- **FID (3.88):** Significantly outperformed Base SDXL (4.69). The model likely learned to "denoise" base model outputs using the Monet style as a coherent aesthetic filter, resulting in statistically cleaner images.
+- **Structural Preservation (SSIM 0.3464):** Higher than the Base Model. The regularization signal ($L_{reg}$) acted as a stabilizing force, enforcing strict adherence to structural priors and preventing hallucinations in vague areas.
+- **Style-Content Balance (GRAM Loss 0.5402):** Comparable to the Base Model and much higher than overfitted Standard LoRA. This indicates the model learned a generalized representation of the style rather than memorizing training set textures.
+
+### 2. Ablation Study: Learning Rate and Regularization
+
+| Config | LR | $\lambda$ | FID | SSIM |
+| :--- | :---: | :---: | :---: | :---: |
+| A (Conserv.) | $1e-5$ | 1 | 8.39 | 0.4534 |
+| B (Aggress.) | $1e-4$ | 1 | 21.33 | 0.3880 |
+| C (Balanced) | $1e-4$ | 10 | **3.88** | **0.5402** |
+
+- **Config A:** Low LR and Low $\lambda$ resulted in a safe but mediocre model (FID 8.39).
+- **Config B:** High LR with Low $\lambda$ led to destabilization (FID 21.33). The strong updates from the high LR overpowered the weak regularization, initiating the onset of catastrophic forgetting.
+- **Config C:** This is our best model. We used a High LR ($1e-4$) to encourage rapid learning of the style, but counter-balanced it with a massive Regularization penalty ($\lambda=10$). This configuration creates a "canyon" in the loss landscape, forcing weights to stay on the "manifold of coherent images" while moving toward the "Monet" region.

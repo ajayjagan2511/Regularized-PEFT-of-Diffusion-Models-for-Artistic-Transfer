@@ -1,10 +1,10 @@
 # preprocess_images.py
 import os
+import argparse
 from PIL import Image
 
 # --- Configuration ---
-TARGET_SIZE = 1024
-IMAGE_DIR = "./data/monet_style_original" # The directory with your images
+# TARGET_SIZE and IMAGE_DIR are now command-line arguments
 
 def resize_and_crop(image_path, output_size):
     """
@@ -47,9 +47,15 @@ def resize_and_crop(image_path, output_size):
 
 
 if __name__ == "__main__":
-    print(f"Starting to process images in {IMAGE_DIR}...")
-    for filename in os.listdir(IMAGE_DIR):
+    parser = argparse.ArgumentParser(description="Preprocess images by resizing and cropping to square.")
+    parser.add_argument("--image_dir", type=str, required=True, help="Directory containing images to preprocess.")
+    parser.add_argument("--target_size", type=int, required=True, help="Target size for the square crop.")
+    
+    args = parser.parse_args()
+    
+    print(f"Starting to process images in {args.image_dir}...")
+    for filename in os.listdir(args.image_dir):
         if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-            file_path = os.path.join(IMAGE_DIR, filename)
-            resize_and_crop(file_path, TARGET_SIZE)
+            file_path = os.path.join(args.image_dir, filename)
+            resize_and_crop(file_path, args.target_size)
     print("Processing complete.")

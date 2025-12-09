@@ -1,10 +1,12 @@
 import os
+import argparse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models, transforms
 from transformers import CLIPProcessor, CLIPModel
-from torchmetrics.image import StructuralSimilarityIndexMeasure, FrechetInceptionDistance
+from torchmetrics.image import StructuralSimilarityIndexMeasure
+from torchmetrics.image.fid import FrechetInceptionDistance
 from huggingface_hub import snapshot_download
 from diffusers import StableDiffusionXLImg2ImgPipeline, AutoencoderKL, UNet2DConditionModel
 from PIL import Image
@@ -17,6 +19,14 @@ import gc
 import json
 import csv
 from datetime import datetime
+
+# Parse arguments
+import argparse
+parser = argparse.ArgumentParser(description="Evaluate SDXL models on style transfer tasks.")
+parser.add_argument("--base_dir", type=str, required=True, help="Base directory for data and outputs.")
+args = parser.parse_args()
+
+BASE_DIR = args.base_dir
 
 # Suppress warnings
 # warnings.filterwarnings("ignore")
@@ -31,19 +41,19 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 TRIGGER_STR = "sks monet style"
 GENERIC_STR = "a painting in the style of Monet"
 FALLBACK_PROMPT = "sksmonet style, a photo of a landscape"
-REPORT_OUTPUT_DIR = "/home/shivamsinghal/LTC/GEN/data/eval_results"
+REPORT_OUTPUT_DIR = os.path.join(BASE_DIR, "eval_results")
 
 # 2. DATASETS
 DATASET_CONFIGS = {
     "Validation": {
-        "orig_dir": "/home/shivamsinghal/LTC/GEN/data/monet_style_original_val",
-        "gt_dir":   "/home/shivamsinghal/LTC/GEN/data/monet_style_val",
-        "output_root": "/home/shivamsinghal/LTC/GEN/data/eval_results/val"
+        "orig_dir": os.path.join(BASE_DIR, "monet_style_original_val"),
+        "gt_dir":   os.path.join(BASE_DIR, "monet_style_val"),
+        "output_root": os.path.join(BASE_DIR, "eval_results", "val")
     },
     "Test": {
-        "orig_dir": "/home/shivamsinghal/LTC/GEN/data/monet_style_test",
-        "gt_dir":   "/home/shivamsinghal/LTC/GEN/data/monet_style_original_test",
-        "output_root": "/home/shivamsinghal/LTC/GEN/data/eval_results/test"
+        "orig_dir": os.path.join(BASE_DIR, "monet_style_test"),
+        "gt_dir":   os.path.join(BASE_DIR, "monet_style_original_test"),
+        "output_root": os.path.join(BASE_DIR, "eval_results", "test")
     }
 }
 

@@ -4,6 +4,7 @@ accelerate
 transformers
 peft
 torchmetrics
+torch-fidelity
 bitsandbytes
 
 # Utilities
