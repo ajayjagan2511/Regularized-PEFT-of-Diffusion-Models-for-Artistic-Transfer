@@ -18,11 +18,21 @@ git clone https://github.com/yourusername/regdiffusion-peft.git
 cd regdiffusion-peft
 ```
 
-Install dependencies (this project relies on `diffusers`, `accelerate`, `peft`, and `torchmetrics` for evaluation):
+Create Environment and Install dependencies (this project relies on `diffusers`, `accelerate`, `peft`, and `torchmetrics` for evaluation):
 
 ```bash
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118  # Adjust for your CUDA version
-pip install -U diffusers accelerate transformers peft wandb bitsandbytes torchmetrics hf_transfer huggingface_hub
+# 1. Create a Conda environment with Python 3.13
+conda create -n reg_peft python=3.13 -y
+
+# 2. Activate the environment
+conda activate reg_peft
+
+# 3. Install PyTorch specifically with CUDA 11.8 support (Recommended for stability)
+# Note: Doing this *before* the requirements file ensures the correct GPU version is locked.
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+
+# 4. Install the remaining requirements
+pip install -r requirements.txt
 ```
 
 Configure Accelerate (Mixed Precision FP16 is recommended):
@@ -31,13 +41,37 @@ Configure Accelerate (Mixed Precision FP16 is recommended):
 accelerate config
 ```
 
+Below is the standard response for the same.
+```
+- In which compute environment are you running?
+  Answer: This machine
+
+- Which type of machine are you using?
+  Answer: No distributed training
+
+- Do you want to run your training on CPU only (only recommended for testing purposes)?
+  Answer: no
+
+- Do you wish to optimize your script with torch dynamo?
+  Answer: no
+
+- Do you want to use DeepSpeed?
+  Answer: no
+
+- What GPU(s) (by id) should be used for training on this machine as a comma-separated list? [all]
+  Answer: all
+
+- Do you wish to use FP16 or BF16 (mixed precision)?
+  Answer: fp16
+```
+
 ---
 
 ## 📊 Data Preparation
 
 The training pipeline requires **paired data** (Content Image ↔ Style Image).
 
-Structure your data directory as follows:
+Structure your data directory as follows (already configured here):
 
 ```text
 /path/to/data/
